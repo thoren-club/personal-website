@@ -3,87 +3,39 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f3e8d2">
+  <meta name="theme-color" content="#ffffff">
   <title>Привет!</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600&display=swap" rel="stylesheet">
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;600&family=Unbounded:wght@500;700&display=swap');
-
-    :root {
-      --ink: #17211b;
-      --paper: #f3e8d2;
-      --accent: #e95c32;
-      --soft: #b9ccba;
-    }
-
     * { box-sizing: border-box; }
 
-    html, body { min-height: 100%; }
+    html,
+    body {
+      width: 100%;
+      min-height: 100%;
+    }
 
     body {
       margin: 0;
       min-height: 100svh;
-      overflow: hidden;
       display: grid;
       place-items: center;
-      color: var(--ink);
-      background:
-        radial-gradient(circle at 18% 24%, rgba(233, 92, 50, .22), transparent 27rem),
-        radial-gradient(circle at 82% 74%, rgba(91, 130, 99, .25), transparent 30rem),
-        var(--paper);
-      font-family: "Manrope", sans-serif;
-    }
-
-    body::before {
-      content: "";
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      opacity: .22;
-      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.2'/%3E%3C/svg%3E");
-      mix-blend-mode: multiply;
-    }
-
-    .orb {
-      position: fixed;
-      width: min(52vw, 42rem);
-      aspect-ratio: 1;
-      border: 1px solid rgba(23, 33, 27, .13);
-      border-radius: 50%;
-      animation: breathe 9s ease-in-out infinite;
-    }
-
-    .orb::after {
-      content: "";
-      position: absolute;
-      inset: 12%;
-      border: inherit;
-      border-radius: inherit;
-    }
-
-    main {
-      position: relative;
-      z-index: 1;
-      width: min(92vw, 72rem);
-      text-align: center;
-    }
-
-    .eyebrow {
-      margin: 0 0 2rem;
-      font-size: .72rem;
-      font-weight: 600;
-      letter-spacing: .24em;
-      text-transform: uppercase;
-      opacity: .52;
+      overflow: hidden;
+      background: #fff;
+      color: #000;
+      font-family: "Inter", sans-serif;
     }
 
     h1 {
-      min-height: 1.25em;
       margin: 0;
-      font-family: "Unbounded", sans-serif;
-      font-size: clamp(3.4rem, 11vw, 9.5rem);
-      font-weight: 700;
-      letter-spacing: -.07em;
-      line-height: 1.05;
+      padding: 1rem;
+      font-size: clamp(3.25rem, 10vw, 9rem);
+      font-weight: 600;
+      line-height: 1;
+      letter-spacing: -.06em;
+      text-align: center;
       transition: filter .55s ease, opacity .55s ease, transform .55s ease;
       will-change: filter, opacity, transform;
     }
@@ -91,74 +43,32 @@
     h1.switching {
       filter: blur(24px);
       opacity: 0;
-      transform: scale(.94);
-    }
-
-    .language {
-      display: inline-flex;
-      align-items: center;
-      gap: .55rem;
-      margin-top: 2.2rem;
-      padding: .55rem .85rem;
-      border: 1px solid rgba(23, 33, 27, .16);
-      border-radius: 999px;
-      font-size: .78rem;
-      letter-spacing: .08em;
-      transition: opacity .4s ease;
-    }
-
-    .dot {
-      width: .45rem;
-      aspect-ratio: 1;
-      border-radius: 50%;
-      background: var(--accent);
-      box-shadow: 0 0 0 .25rem rgba(233, 92, 50, .12);
-    }
-
-    @keyframes breathe {
-      0%, 100% { transform: scale(.9) rotate(-5deg); opacity: .55; }
-      50% { transform: scale(1.08) rotate(5deg); opacity: 1; }
-    }
-
-    @media (max-width: 600px) {
-      .orb { width: 88vw; }
-      .eyebrow { margin-bottom: 1.4rem; }
-      h1 { font-size: clamp(2.7rem, 14vw, 5rem); }
+      transform: scale(.96);
     }
 
     @media (prefers-reduced-motion: reduce) {
-      .orb { animation: none; }
       h1 { transition-duration: .01ms; }
     }
   </style>
 </head>
 <body>
-  <div class="orb" aria-hidden="true"></div>
-  <main>
-    <p class="eyebrow">one world · many hellos</p>
-    <h1 id="hello" aria-live="polite">Привет!</h1>
-    <div class="language" aria-hidden="true">
-      <span class="dot"></span>
-      <span id="language">Русский</span>
-    </div>
-  </main>
+  <h1 id="hello" aria-live="polite">Привет!</h1>
 
   <script>
     const greetings = [
-      ["Привет!", "Русский"],
-      ["Hello!", "English"],
-      ["Hola!", "Español"],
-      ["Bonjour!", "Français"],
-      ["Ciao!", "Italiano"],
-      ["Hallo!", "Deutsch"],
-      ["Olá!", "Português"],
-      ["こんにちは!", "日本語"],
-      ["안녕하세요!", "한국어"],
-      ["你好!", "中文"]
+      ["Привет!", "ru"],
+      ["Hello!", "en"],
+      ["Hola!", "es"],
+      ["Bonjour!", "fr"],
+      ["Ciao!", "it"],
+      ["Hallo!", "de"],
+      ["Olá!", "pt"],
+      ["こんにちは!", "ja"],
+      ["안녕하세요!", "ko"],
+      ["你好!", "zh"]
     ];
 
     const hello = document.querySelector("#hello");
-    const language = document.querySelector("#language");
     let index = 0;
 
     setInterval(() => {
@@ -167,8 +77,7 @@
       setTimeout(() => {
         index = (index + 1) % greetings.length;
         hello.textContent = greetings[index][0];
-        language.textContent = greetings[index][1];
-        document.documentElement.lang = greetings[index][1].slice(0, 2).toLowerCase();
+        document.documentElement.lang = greetings[index][1];
         hello.classList.remove("switching");
       }, 560);
     }, 2200);
