@@ -1,4 +1,4 @@
-# hello-blur
+# personal-website
 
 A tiny multilingual greeting page with a soft blur transition.
 
