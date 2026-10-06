@@ -30,6 +30,23 @@ button { -webkit-tap-highlight-color: transparent; }
 
 
 #rings { transform-origin: 50% 50%; will-change: transform; }
+#field { position: absolute; inset: 0; transform-origin: 50% 50%; will-change: transform; }
+.field-cell { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
+.field-tile { background-size: contain !important; background-repeat: no-repeat; background-color: transparent; }
+#gallery[data-view="field"] { cursor: grab; }
+#gallery.is-dragging, #gallery.is-dragging .tile { cursor: grabbing; }
+#gallery.is-dragging .tile { pointer-events: none; }
+.view-control { position: fixed; top: 70px; right: 22px; z-index: 220; }
+.view-toggle { display: grid; place-items: center; width: 38px; height: 38px; padding: 0; border: 1px solid #d2d2d2; border-radius: 50%; color: #555; background: #ffffffed; cursor: pointer; transform: scale(.01); pointer-events: none; transition: transform 350ms cubic-bezier(.22,.7,.25,1), border-color 180ms; }
+.view-control.is-visible .view-toggle, .view-control:focus-within .view-toggle { transform: scale(1); pointer-events: auto; }
+.view-toggle:hover { border-color: #777; }
+.view-toggle:focus-visible { outline: 2px solid #111; outline-offset: 4px; }
+.view-field-icon { display: none; }
+.view-toggle[data-view="orbit"] .view-orbit-icon { display: none; }
+.view-toggle[data-view="orbit"] .view-field-icon { display: block; }
+@media (hover: none) { .view-toggle { transform: scale(1); pointer-events: auto; } }
+@media (max-width: 760px) { .view-control { top: calc(min(487px, 100vw - 40px) * 76 / 487 + 72px); right: 20px; } .view-toggle { width: 30px; height: 30px; } }
+@media (prefers-reduced-motion: reduce) { .view-toggle { transition: none; } }
 .expanded-card { display: none; }
 
 .camera-card { z-index: 150 !important; }

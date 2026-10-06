@@ -4,6 +4,12 @@ const vignette = document.querySelector(".vignette");
 let camera = 0, cameraMotion = null, previousCameraLog = 0, cameraBlur = 0;
 const stage = document.querySelector('#gallery');
 const root = document.querySelector('#rings');
+const fieldRoot = document.querySelector('#field');
+const viewControl = document.querySelector('.view-control');
+const viewToggle = document.querySelector('.view-toggle');
+let view = 'field';
+let viewAnimation = null;
+const field = { x: 0, y: 0, targetX: 0, targetY: 0, zoom: .9, cells: [], columns: 0, rows: 0, width: 240, gapX: 325, gapY: 255 };
 const hint = document.querySelector('#hint');
 const announcement = document.querySelector('#announcement');
 const viewer = document.querySelector('#viewer');
@@ -44,6 +50,111 @@ const rings = Array.from({ length: CONFIG.inner + CONFIG.outer + 1 }, () => {
   root.append(node); return ring;
 });
 
+// Recycle a viewport-sized pool instead of growing the DOM as the field moves.
+function prepareField() {
+  field.width = innerWidth <= 760 ? 200 : 240;
+  field.gapX = innerWidth <= 760 ? 275 : 325;
+  field.gapY = innerWidth <= 760 ? 220 : 255;
+  const columns = Math.ceil(innerWidth / (field.gapX * .84)) + 6;
+  const rows = Math.ceil(innerHeight / (field.gapY * .84)) + 6;
+  if (columns === field.columns && rows === field.rows) return;
+  fieldRoot.replaceChildren(); field.cells = [];
+  field.columns = columns; field.rows = rows;
+  for (let slot = 0; slot < columns * rows; slot++) {
+    const node = document.createElement('div'); node.className = 'field-cell';
+    const button = document.createElement('button');
+    button.type = 'button'; button.className = 'tile field-tile'; button.tabIndex = -1;
+    const cell = {node, button, slot, key: null, rotation: 0, worldScale: 1, field: true};
+    button.addEventListener('pointerenter', e => { if (e.pointerType === 'mouse' && !selected && !drag) { button.classList.add('is-hovered'); requestRender(); } });
+    button.addEventListener('pointerleave', () => { button.classList.remove('is-hovered'); requestRender(); });
+    button.addEventListener('focus', requestRender); button.addEventListener('blur', requestRender);
+    button.addEventListener('click', e => {
+      if (!drag && performance.now() >= suppressClickUntil) openCard(button, cell, e.detail === 0);
+    });
+    node.append(button); fieldRoot.append(node); field.cells.push(cell);
+  }
+}
+function renderField(dt) {
+  let animating = false;
+  if (!selected) {
+    const follow = reduced ? 1 : 1 - Math.exp(-dt / (drag ? 85 : 150));
+    field.x += (field.targetX - field.x) * follow;
+    field.y += (field.targetY - field.y) * follow;
+    const zoomTarget = drag && (drag.mouse || drag.moved) ? .86 : 1;
+    field.zoom += (zoomTarget - field.zoom) * (reduced ? 1 : 1 - Math.exp(-dt / (drag ? 220 : 370)));
+  }
+  const startColumn = Math.floor(field.x / field.gapX) - Math.floor(field.columns / 2);
+  const startRow = Math.floor(field.y / field.gapY) - Math.floor(field.rows / 2);
+  for (const cell of field.cells) {
+    const col = startColumn + cell.slot % field.columns;
+    const row = startRow + Math.floor(cell.slot / field.columns);
+    const key = `${col}:${row}`;
+    const index = ARTWORKS.length ? modulo(col + row * 7, ARTWORKS.length) : 0;
+    const item = ARTWORKS[index];
+    const button = cell.button;
+    if (key !== cell.key && button !== selected?.button) {
+      cell.key = key; button.classList.remove('is-hovered');
+      button.dataset.artwork = index;
+      button.style.backgroundImage = item ? `url("${item.thumb}")` : '';
+      button.setAttribute('aria-label', `View ${item?.title || 'artwork'}`);
+    }
+    // Offset alternating rows; coordinates stay deterministic in both directions.
+    const x = col * field.gapX + modulo(row, 2) * field.gapX / 2 - field.x;
+    const y = row * field.gapY - field.y;
+    const cardWidth = item ? Math.min(field.width, 205 * item.width / item.height) : field.width;
+    const height = item ? cardWidth * item.height / item.width : 180;
+    cell.cardWidth = cardWidth;
+    cell.worldScale = field.zoom;
+    cell.node.style.transform = `scale(${field.zoom})`;
+    const visible = item && Math.abs(x * field.zoom) < innerWidth / 2 + field.width && Math.abs(y * field.zoom) < innerHeight / 2 + height;
+    cell.node.style.visibility = visible ? '' : 'hidden';
+    const inside = visible && Math.abs(x * field.zoom) < innerWidth / 2 - 40 && Math.abs(y * field.zoom) < innerHeight / 2 - 80;
+    cell.node.setAttribute('aria-hidden', String(!inside));
+    button.tabIndex = inside ? 0 : -1;
+    const hovering = !selected && !drag && (button.classList.contains('is-hovered') || button.matches(':focus-visible'));
+    const hover = Number(button.dataset.hoverScale || 1);
+    const hoverScale = hover + ((hovering ? 1.055 : 1) - hover) * (reduced ? 1 : 1 - Math.exp(-dt / 170));
+    if (Math.abs(hoverScale - (hovering ? 1.055 : 1)) > .0001) animating = true;
+    button.dataset.hoverScale = hoverScale;
+    button.dataset.worldAngle = '0';
+    button.style.left = `${x}px`; button.style.top = `${y}px`;
+    button.style.width = `${cardWidth}px`; button.style.height = `${height}px`;
+    button.style.setProperty('--angle', '0deg'); button.style.setProperty('--hover', hoverScale);
+    cell.node.style.zIndex = hovering ? '2' : '';
+  }
+  stage.dataset.fieldX = field.x.toFixed(2); stage.dataset.fieldY = field.y.toFixed(2);
+  stage.dataset.fieldZoom = field.zoom.toFixed(4);
+  if (!hintShown) {
+    hintShown = true;
+    hint.textContent = touchQuery.matches ? 'Drag to explore' : 'Drag or scroll to explore';
+    hint.classList.add('visible'); setTimeout(() => hint.classList.remove('visible'), 6000);
+  }
+  return animating || (!selected && (Math.abs(field.x - field.targetX) + Math.abs(field.y - field.targetY) > .05 || Math.abs(field.zoom - (drag && (drag.mouse || drag.moved) ? .86 : 1)) > .0001));
+}
+function setView(nextView) {
+  if (selected || drag) return;
+  if (document.activeElement.classList.contains('tile')) document.activeElement.blur();
+  view = nextView;
+  fieldRoot.hidden = view !== 'field'; fieldRoot.inert = view !== 'field';
+  root.hidden = view !== 'orbit'; root.inert = view !== 'orbit';
+  stage.dataset.view = view; viewToggle.dataset.view = view;
+  const label = view === 'field' ? 'Switch to orbit view' : 'Switch to field view';
+  viewToggle.setAttribute('aria-label', label); viewToggle.title = label;
+  if (view === 'field') { field.zoom = .9; prepareField(); }
+  else {
+    skipIntro = true;
+    viewAnimation?.cancel();
+    if (!reduced) viewAnimation = root.animate([{transform: 'scale(.88)'}, {transform: 'scale(1)'}], {duration: 750, easing: 'cubic-bezier(.22,.7,.25,1)'});
+  }
+  hintShown = false; requestRender();
+}
+viewToggle.addEventListener('click', () => setView(view === 'field' ? 'orbit' : 'field'));
+document.addEventListener('pointermove', e => {
+  const corner = e.clientX > innerWidth - 90 && e.clientY < 145;
+  viewControl.classList.toggle('is-visible', !selected && (corner || viewControl.contains(e.target)));
+});
+document.documentElement.addEventListener('pointerleave', () => viewControl.classList.remove('is-visible'));
+
 function requestRender() {
   if (!frame && !document.hidden) { lastTime = performance.now(); frame = requestAnimationFrame(render); }
 }
@@ -51,6 +162,7 @@ function resize() {
   const brand = document.querySelector('.brand-name');
   if (brand) brand.style.setProperty('--brand-scale', brand.clientWidth / 487);
   scale = Math.min(innerWidth / 1080, innerHeight / 1080);
+  if (!selected) prepareField();
   if (selected) positionExpanded();
   requestRender();
 }
@@ -65,6 +177,14 @@ function render(now) {
       if (returning) finishReturn();
       else { closeButton.hidden = false; closeButton.focus({ preventScroll: true }); }
     }
+  }
+  if (view === 'field') {
+    const fieldAnimating = renderField(dt);
+    renderCamera(dt);
+    stage.dataset.ready = 'true';
+    stage.dataset.introPhase = 'field';
+    frame = (cameraMotion || fieldAnimating) ? requestAnimationFrame(render) : 0;
+    return;
   }
   const elapsed = now - startTime;
   const introDone = skipIntro || elapsed >= CONFIG.introDuration;
@@ -184,23 +304,71 @@ stage.addEventListener('wheel', e => {
   if (e.ctrlKey) return;
   e.preventDefault();
   const unit = e.deltaMode === 1 ? 20 : e.deltaMode === 2 ? innerHeight : 1;
+  if (view === 'field') {
+    if (viewer.open) return;
+    interact();
+    field.targetX += (e.shiftKey && !e.deltaX ? e.deltaY : e.deltaX) * unit / field.zoom;
+    field.targetY += (e.shiftKey && !e.deltaX ? 0 : e.deltaY) * unit / field.zoom;
+    requestRender(); return;
+  }
   move(clamp(e.deltaY * unit, -480, 480) / 850);
 }, { passive: false });
 stage.addEventListener('pointerdown', e => {
+  if (view === 'field') {
+    if (viewer.open || e.button !== 0 || (e.pointerType === 'mouse' && e.target.closest('.tile'))) return;
+    interact();
+    drag = { id: e.pointerId, x: e.clientX, y: e.clientY, previousX: e.clientX, previousY: e.clientY, moved: false, field: true, mouse: e.pointerType === 'mouse' };
+    if (e.pointerType === 'mouse') stage.setPointerCapture(e.pointerId);
+    if (drag.mouse) stage.classList.add('is-dragging');
+    field.cells.forEach(cell => cell.button.classList.remove('is-hovered'));
+    requestRender(); return;
+  }
   if (e.pointerType === 'mouse' || viewer.open) return;
   drag = { id: e.pointerId, start: e.clientY, previous: e.clientY, moved: false };
 });
 stage.addEventListener('pointermove', e => {
   if (!drag || drag.id !== e.pointerId) return;
+  if (drag.field) {
+    if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 6) {
+      if (!drag.moved && !stage.hasPointerCapture(e.pointerId)) stage.setPointerCapture(e.pointerId);
+      drag.moved = true;
+      stage.classList.add('is-dragging');
+    }
+    if (drag.moved) {
+      field.targetX -= (e.clientX - drag.previousX) / field.zoom;
+      field.targetY -= (e.clientY - drag.previousY) / field.zoom;
+      suppressClickUntil = performance.now() + 350;
+      requestRender();
+    }
+    drag.previousX = e.clientX; drag.previousY = e.clientY; return;
+  }
   const distance = drag.previous - e.clientY;
   if (Math.abs(e.clientY - drag.start) > 8) drag.moved = true;
   if (drag.moved) { move(distance / Math.max(300, innerHeight * .65)); suppressClickUntil = performance.now() + 350; }
   drag.previous = e.clientY;
 });
-function endDrag(e) { if (drag?.id === e.pointerId) drag = null; }
+function endDrag(e) {
+  if (drag?.id !== e.pointerId) return;
+  drag = null; stage.classList.remove('is-dragging');
+  if (stage.hasPointerCapture(e.pointerId)) stage.releasePointerCapture(e.pointerId);
+  requestRender();
+}
 stage.addEventListener('pointerup', endDrag); stage.addEventListener('pointercancel', endDrag);
+stage.addEventListener('lostpointercapture', endDrag);
 document.addEventListener('keydown', e => {
   if (viewer.open) return;
+  if (e.target.closest('a, .view-toggle')) return;
+  if (view === 'field') {
+    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home'].includes(e.key)) {
+      e.preventDefault(); interact();
+      if (e.key === 'Home') { field.targetX = 0; field.targetY = 0; }
+      else if (e.key === 'ArrowLeft') field.targetX -= 180;
+      else if (e.key === 'ArrowRight') field.targetX += 180;
+      else field.targetY += (['ArrowUp', 'PageUp'].includes(e.key) ? -1 : 1) * (e.key.startsWith('Page') ? innerHeight * .75 : 180);
+      requestRender();
+    }
+    return;
+  }
   const tile = document.activeElement.classList.contains('tile');
   if (e.key === ' ' && tile) return;
   if (['ArrowDown', 'PageDown', 'ArrowUp', 'PageUp', 'Home', 'End', ' '].includes(e.key)) {
@@ -228,15 +396,17 @@ function positionExpanded() {
   closeButton.style.top = `${Math.max(8, g.top - 40)}px`;
 }
 function renderCamera(dt) {
+  const sceneRoot = view === 'field' ? fieldRoot : root;
   if (!selected) {
-    root.style.transform = ''; root.style.filter = ''; stage.style.filter = ''; vignette.style.transform = '';
+    sceneRoot.style.transform = ''; sceneRoot.style.filter = ''; stage.style.filter = ''; vignette.style.transform = '';
     previousCameraLog = 0; cameraBlur = 0;
     stage.dataset.camera = '0'; stage.dataset.blur = '0';
     return;
   }
   const {button, ring} = selected;
   const target = expandedGeometry();
-  const zoom = Math.exp(Math.log(target.width / (CONFIG.size * ring.worldScale)) * camera);
+  const cardSize = ring.field ? ring.cardWidth : CONFIG.size;
+  const zoom = Math.exp(Math.log(target.width / (cardSize * ring.worldScale)) * camera);
   const angle = -Number(button.dataset.worldAngle) * camera;
   const radians = (ring.rotation + angle) * Math.PI / 180;
   const x = parseFloat(button.style.left), y = parseFloat(button.style.top);
@@ -246,14 +416,14 @@ function renderCamera(dt) {
   const ox = ring.worldScale * (x * Math.cos(original) - y * Math.sin(original));
   const oy = ring.worldScale * (x * Math.sin(original) + y * Math.cos(original));
   const tx = -px * zoom + ox * (1 - camera), ty = -py * zoom + oy * (1 - camera);
-  root.style.transform = `translate3d(${tx}px,${ty}px,0) rotate(${angle}deg) scale(${zoom})`;
+  sceneRoot.style.transform = `translate3d(${tx}px,${ty}px,0) rotate(${angle}deg) scale(${zoom})`;
   // The same card follows the camera in screen coordinates, avoiding tiny-layer upscaling.
   const hover = Number(button.dataset.hoverScale || 1);
-  const width = CONFIG.size * ring.worldScale * zoom * hover;
+  const width = cardSize * ring.worldScale * zoom * (1 + (hover - 1) * (1 - camera));
   button.style.left = `${innerWidth / 2 + ox * (1 - camera)}px`;
   button.style.top = `${innerHeight / 2 + oy * (1 - camera)}px`;
   button.style.width = `${width}px`;
-  button.style.height = `${width * (1 + (selected.item.height / selected.item.width - 1) * camera)}px`;
+  button.style.height = `${width * (ring.field ? selected.item.height / selected.item.width : 1 + (selected.item.height / selected.item.width - 1) * camera)}px`;
   button.style.transform = `translate(-50%,-50%) rotate(${Number(button.dataset.worldAngle) * (1 - camera)}deg)`;
   vignette.style.transform = '';
   const log = Math.log(zoom);
@@ -264,11 +434,12 @@ function renderCamera(dt) {
   if (!cameraMotion) cameraBlur = 0;
   const surroundingBlur = cameraBlur + 3.5 * accelerate(camera);
   // Filter is evaluated before the camera transform; compensate for its scale.
-  root.style.filter = surroundingBlur > .05 ? `blur(${(surroundingBlur / zoom).toFixed(4)}px)` : '';
+  sceneRoot.style.filter = surroundingBlur > .05 ? `blur(${(surroundingBlur / zoom).toFixed(4)}px)` : '';
   stage.style.filter = '';
   stage.dataset.surroundingBlur = surroundingBlur.toFixed(3);
   stage.dataset.camera = camera.toFixed(5); stage.dataset.blur = cameraBlur.toFixed(3);
   stage.dataset.peakBlur = Math.max(Number(stage.dataset.peakBlur || 0), cameraBlur).toFixed(3);
+  if (view === 'field') return;
   const ca = angle * Math.PI / 180;
   for (const r of rings) for (const card of r.cards) {
     if (card === button || r.node.style.display === 'none') continue;
@@ -284,17 +455,20 @@ function renderCamera(dt) {
 }
 function openCard(button, ring, returnKeyboardFocus) {
   if (selected || !ARTWORKS.length) return;
+  viewAnimation?.cancel();
+  if (ring.field) { field.targetX = field.x; field.targetY = field.y; }
   interact(); motion = null; manualVelocity = 0;
   const item = ARTWORKS[Number(button.dataset.artwork)];
   stage.dataset.peakBlur = '0';
   selected = {button, ring, item, returnKeyboardFocus};
   rings.forEach(r => r.cards.forEach(card => card.classList.remove('is-hovered')));
+  field.cells.forEach(cell => cell.button.classList.remove('is-hovered'));
   stage.append(button); button.classList.add('camera-card');
   title.textContent = item.title;
   expandedImage.alt = item.title;
   const full = new Image(); full.src = item.image;
   full.decode().then(() => { if (selected?.button === button) button.style.backgroundImage = `url("${item.image}")`; }).catch(() => {});
-  const zoom = expandedGeometry().width / (CONFIG.size * ring.worldScale);
+  const zoom = expandedGeometry().width / ((ring.field ? ring.cardWidth : CONFIG.size) * ring.worldScale);
   cameraMotion = {from: camera, to: 1, start: performance.now(), duration: 1200 + Math.min(950, Math.abs(Math.log(zoom)) * 150)};
   closing = false; viewer.showModal(); positionExpanded(); closeButton.hidden = true;
   requestRender();
@@ -311,6 +485,7 @@ function finishReturn() {
   button.style.backgroundImage = `url("${selected.item.thumb}")`; button.style.height = ''; button.style.width = ''; button.style.transform = '';
   button.classList.remove('camera-card', 'is-hovered'); selected.ring.node.append(button);
   selected = null; closing = false; viewer.close();
+  if (view === 'field') prepareField();
   if (pendingArtworks) { setArtworks(pendingArtworks); pendingArtworks = null; }
   // The dialog can restore focus itself. Escape must not turn a mouse click
   // into a persistent keyboard highlight on the returning image.
@@ -320,6 +495,7 @@ function finishReturn() {
 function setArtworks(items) {
   if (selected) { pendingArtworks = items; return; }
   ARTWORKS = items;
+  field.cells.forEach(cell => { cell.key = null; });
   rings.forEach(ring => { ring.sequence = null; }); requestRender();
 }
 if (location.hostname === '127.0.0.1' || location.hostname === 'localhost') {
@@ -331,4 +507,4 @@ viewer.addEventListener('cancel', e => { e.preventDefault(); closeCard(); });
 window.addEventListener('resize', resize);
 motionQuery.addEventListener('change', e => { reduced = e.matches; if (reduced) skipIntro = true; requestRender(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden) { cancelAnimationFrame(frame); frame = 0; } else requestRender(); });
-resize();
+setView('field'); resize();
