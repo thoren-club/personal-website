@@ -9,7 +9,7 @@ const viewControl = document.querySelector('.view-control');
 const viewToggle = document.querySelector('.view-toggle');
 let view = 'field';
 let viewAnimation = null;
-const field = { x: 0, y: 0, targetX: 0, targetY: 0, zoom: .9, cells: [], columns: 0, rows: 0, width: 240, gapX: 325, gapY: 255 };
+const field = { x: 0, y: 0, targetX: 0, targetY: 0, zoom: .9, cells: [], columns: 0, rows: 0, width: 400, gapX: 442.5, gapY: 337.5 };
 const hint = document.querySelector('#hint');
 const announcement = document.querySelector('#announcement');
 const viewer = document.querySelector('#viewer');
@@ -52,9 +52,10 @@ const rings = Array.from({ length: CONFIG.inner + CONFIG.outer + 1 }, () => {
 
 // Recycle a viewport-sized pool instead of growing the DOM as the field moves.
 function prepareField() {
-  field.width = innerWidth <= 760 ? 200 : 240;
-  field.gapX = innerWidth <= 760 ? 275 : 325;
-  field.gapY = innerWidth <= 760 ? 220 : 255;
+  const mobile = innerWidth <= 760;
+  field.width = mobile ? 320 : 400;
+  field.gapX = field.width + (mobile ? 37.5 : 42.5);
+  field.gapY = field.width * .75 + (mobile ? 35 : 37.5);
   const columns = Math.ceil(innerWidth / (field.gapX * .84)) + 6;
   const rows = Math.ceil(innerHeight / (field.gapY * .84)) + 6;
   if (columns === field.columns && rows === field.rows) return;
@@ -101,7 +102,7 @@ function renderField(dt) {
     // Offset alternating rows; coordinates stay deterministic in both directions.
     const x = col * field.gapX + modulo(row, 2) * field.gapX / 2 - field.x;
     const y = row * field.gapY - field.y;
-    const cardWidth = item ? Math.min(field.width, 205 * item.width / item.height) : field.width;
+    const cardWidth = item ? Math.min(field.width, field.width * .75 * item.width / item.height) : field.width;
     const height = item ? cardWidth * item.height / item.width : 180;
     cell.cardWidth = cardWidth;
     cell.worldScale = field.zoom;
