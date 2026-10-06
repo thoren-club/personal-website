@@ -21,6 +21,27 @@ window.GALLERY_IMAGES = [
     "height": 1200
   },
   {
+    "title": "Frame 2147225744",
+    "image": "./assets/auto-frame-2147225744-fcad71972632.webp",
+    "thumb": "./assets/auto-frame-2147225744-fcad71972632-thumb.webp",
+    "width": 2376,
+    "height": 3020
+  },
+  {
+    "title": "Frame 2147225745",
+    "image": "./assets/auto-frame-2147225745-c49e1ea18ba9.webp",
+    "thumb": "./assets/auto-frame-2147225745-c49e1ea18ba9-thumb.webp",
+    "width": 2376,
+    "height": 3020
+  },
+  {
+    "title": "image 19",
+    "image": "./assets/auto-image-19-3ae9ea92bdb3.webp",
+    "thumb": "./assets/auto-image-19-3ae9ea92bdb3-thumb.webp",
+    "width": 1600,
+    "height": 1200
+  },
+  {
     "title": "Profile Glow",
     "image": "./assets/auto-profile-glow-ea3f6e5ee9e1.webp",
     "thumb": "./assets/auto-profile-glow-ea3f6e5ee9e1-thumb.webp",
