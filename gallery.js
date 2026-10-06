@@ -191,8 +191,32 @@ function beginLayoutMotion(source, destination) {
   const add = (from, to) => {
     if (!from || !to) return;
     const node = document.createElement('div'); node.className = 'morph-card';
+    const width = Math.max(1, from.width, to.width), height = Math.max(1, from.height, to.height);
+    const item = ARTWORKS[Number(to.artwork)];
+    const aspect = item ? item.width / item.height : to.width / to.height;
+    const textureWidth = Math.max(width, height * aspect), textureHeight = textureWidth / aspect;
+    node.style.width = `${textureWidth}px`; node.style.height = `${textureHeight}px`;
+    node.style.zIndex = String(Math.max(from.layer, to.layer));
     node.style.backgroundImage = to.image;
-    layer.append(node); cards.push({node, from, to});
+    layer.append(node);
+    const turn = modulo(to.angle - from.angle + 180, 360) - 180;
+    const widthRatio = Math.log(to.width / from.width), heightRatio = Math.log(to.height / from.height);
+    const cardFrames = [];
+    // Scale the photograph uniformly and change only its crop. Fixed raster
+    // dimensions avoid per-frame layout and preserve the image's aspect ratio.
+    for (let step = 0; step <= 40; step++) {
+      const offset = step / 40, p = accelerate(offset);
+      const x = from.x + (to.x - from.x) * p, y = from.y + (to.y - from.y) * p;
+      const currentWidth = from.width * Math.exp(widthRatio * p);
+      const currentHeight = from.height * Math.exp(heightRatio * p);
+      const cover = Math.max(currentWidth / textureWidth, currentHeight / textureHeight);
+      const insetX = Math.max(0, (1 - currentWidth / (textureWidth * cover)) * 50);
+      const insetY = Math.max(0, (1 - currentHeight / (textureHeight * cover)) * 50);
+      cardFrames.push({offset, transform: `translate3d(${x}px,${y}px,0) translate(-50%,-50%) rotate(${from.angle + turn * p}deg) scale(${cover})`, clipPath: `inset(${insetY}% ${insetX}%)`});
+    }
+    node.style.transform = cardFrames[0].transform;
+    node.style.clipPath = cardFrames[0].clipPath;
+    cards.push({node, cardFrames});
   };
   for (const target of destination.filter(photo => photo.visible)) {
     const origin = nearestPhoto(target, source);
@@ -203,31 +227,29 @@ function beginLayoutMotion(source, destination) {
   for (const origin of source.filter(photo => photo.visible && !used.has(photo))) add(origin, nearestPhoto(origin, destination));
   fieldRoot.style.visibility = 'hidden'; root.style.visibility = 'hidden';
   stage.append(layer); stage.setAttribute('aria-busy', 'true'); viewToggle.disabled = true;
-  layoutMotion = {layer, cards, start: performance.now(), duration: 2800};
-  renderLayoutMotion(layoutMotion.start);
-}
-function renderLayoutMotion(now) {
-  const t = reduced ? 1 : clamp((now - layoutMotion.start) / layoutMotion.duration, 0, 1);
-  const p = accelerate(t);
-  for (const {node, from, to} of layoutMotion.cards) {
-    const x = from.x + (to.x - from.x) * p, y = from.y + (to.y - from.y) * p;
-    const width = Math.exp(Math.log(from.width) + Math.log(to.width / from.width) * p);
-    const height = Math.exp(Math.log(from.height) + Math.log(to.height / from.height) * p);
-    const turn = modulo(to.angle - from.angle + 180, 360) - 180;
-    node.style.width = `${width}px`; node.style.height = `${height}px`;
-    node.style.transform = `translate3d(${x}px,${y}px,0) translate(-50%,-50%) rotate(${from.angle + turn * p}deg)`;
-    node.style.zIndex = String(Math.round(from.layer + (to.layer - from.layer) * p));
+  layoutMotion = {layer, start: performance.now(), duration: 2800, animations: []};
+  const timing = {duration: layoutMotion.duration, fill: 'both', easing: 'linear'};
+  for (const {node, cardFrames} of cards) {
+    const animation = node.animate(cardFrames, timing);
+    animation.startTime = layoutMotion.start;
+    layoutMotion.animations.push(animation);
   }
-  stage.dataset.transition = 'morphing'; stage.dataset.transitionProgress = p.toFixed(4);
-  if (t === 1) finishLayoutMotion();
+  stage.dataset.transition = 'morphing';
+  const current = layoutMotion;
+  Promise.all(current.animations.map(animation => animation.finished)).then(() => {
+    if (layoutMotion === current) finishLayoutMotion();
+  }).catch(() => {}); // Resize can cancel the outgoing animation group.
 }
 function finishLayoutMotion() {
+  if (!layoutMotion) return;
+  for (const animation of layoutMotion.animations) animation.cancel();
   layoutMotion.layer.remove(); layoutMotion = null;
   fieldRoot.style.visibility = ''; root.style.visibility = '';
   stage.setAttribute('aria-busy', 'false'); stage.dataset.transition = 'idle';
   viewToggle.disabled = false;
   announcement.textContent = view === 'field' ? 'Field view. Drag to explore.' : 'Orbit view.';
   if (pendingArtworks) { const items = pendingArtworks; pendingArtworks = null; setArtworks(items); }
+  requestRender();
 }
 viewToggle.addEventListener('click', () => setView(view === 'field' ? 'orbit' : 'field'));
 document.addEventListener('pointermove', e => {
@@ -251,8 +273,7 @@ function resize() {
 function render(now) {
   const dt = clamp(now - lastTime, 0, 50); lastTime = now;
   if (layoutMotion) {
-    renderLayoutMotion(now);
-    frame = requestAnimationFrame(render); return;
+    frame = 0; return;
   }
   if (cameraMotion) {
     const t = reduced ? 1 : clamp((now - cameraMotion.start) / cameraMotion.duration, 0, 1);
@@ -584,6 +605,6 @@ if (location.hostname === '127.0.0.1' || location.hostname === 'localhost') {
 closeButton.addEventListener('click', closeCard); shade.addEventListener('click', closeCard);
 viewer.addEventListener('cancel', e => { e.preventDefault(); closeCard(); });
 window.addEventListener('resize', resize);
-motionQuery.addEventListener('change', e => { reduced = e.matches; if (reduced) skipIntro = true; requestRender(); });
+motionQuery.addEventListener('change', e => { reduced = e.matches; if (reduced) { skipIntro = true; if (layoutMotion) finishLayoutMotion(); } requestRender(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden) { cancelAnimationFrame(frame); frame = 0; } else requestRender(); });
 setView('field'); resize();
