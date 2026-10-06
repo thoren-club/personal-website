@@ -1,6 +1,6 @@
 # Gleb Zyablov — portfolio
 
-Interactive portfolio with rotating rings, depth travel, camera zoom, selective motion blur, a permanent white vignette, font shuffle on entrance, and greetings in the browser title on 20 languages.
+Interactive portfolio with rotating rings, depth travel, camera zoom, selective motion blur, a permanent white vignette, character scramble on entrance, and greetings in the browser title on 20 languages.
 
 ## Production
 
@@ -15,3 +15,4 @@ Requires Node.js, with no npm dependencies. Run `npm start` (or `node index.js`)
 Scroll or swipe to travel in either direction. Click a card to approach it. Escape or the Close button returns to the rings. Header and contact elements stay fixed. Social profiles use thorenclub.
 
 Deploy only when the user explicitly asks to push/deploy, as described in AGENTS.md. Webhook credentials must never be stored in the repository.
+
