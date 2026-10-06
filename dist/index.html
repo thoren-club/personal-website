@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="description" content="Пространственная галерея Gleb. Кольца, движение и исследование работ.">
+  <title>Привет</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./style.css">
+  <script src="./images.js" defer></script>
+  <script src="./gallery.js" defer></script>
+  <script src="./text-reveal.js" defer></script>
+</head>
+<body>
+  <div class="portfolio-chrome">
+    <header class="portfolio-header">
+      <h1 class="brand-name"><img src="./branding/gleb-zyablov.svg" width="487" height="76" alt="Gleb Zyablov"></h1>
+      <a class="portfolio-email" href="mailto:zygleb@gmail.com">zygleb@gmail.com</a>
+    </header>
+    <footer class="portfolio-footer">
+      <p class="portfolio-description">Designer focusing on the Crypto and AI space.</p>
+      <nav class="portfolio-socials" aria-label="Social profiles">
+        <a href="https://t.me/thorenclub" target="_blank" rel="noopener noreferrer" aria-label="Telegram — thorenclub"><img src="./branding/telegram.svg" width="20" height="20" alt=""></a>
+        <a class="social-x" href="https://x.com/thorenclub" target="_blank" rel="noopener noreferrer" aria-label="X — thorenclub"><span class="social-x-art"><img src="./branding/x.svg" width="16" height="14.5006" alt=""></span></a>
+        <a href="https://www.linkedin.com/in/thorenclub/" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn — thorenclub"><img src="./branding/linkedin.svg" width="20" height="20" alt=""></a>
+      </nav>
+    </footer>
+  </div>
+  <main id="gallery" aria-label="Пространственная галерея" aria-describedby="instructions">
+    <div id="rings"></div>
+    <div class="vignette" aria-hidden="true"></div>
+    <p class="hint" id="hint">Прокрутите, чтобы исследовать</p>
+    <p class="sr-only" id="instructions">Прокрутите колесо мыши или проведите пальцем вверх и вниз, чтобы двигаться между кольцами. Стрелки вверх и вниз переключают кольца. Tab выбирает карточку, Enter открывает её, Escape закрывает.</p>
+    <p class="sr-only" id="announcement" aria-live="polite" aria-atomic="true"></p>
+  </main>
+  <dialog id="viewer" aria-labelledby="viewer-title">
+    <div class="viewer-shade"></div>
+    <h1 id="viewer-title" class="sr-only">Просмотр элемента</h1>
+    <div class="expanded-card"><img class="expanded-image" alt=""></div>
+    <button class="close-button" type="button" aria-label="Закрыть элемент">
+      <span>Закрыть</span><kbd aria-hidden="true">Esc</kbd>
+    </button>
+  </dialog>
+  <noscript><p class="no-script">Для пространственной галереи включите JavaScript.</p></noscript>
+</body>
+</html>
