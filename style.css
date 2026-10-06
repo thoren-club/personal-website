@@ -32,6 +32,9 @@ button { -webkit-tap-highlight-color: transparent; }
 #rings { transform-origin: 50% 50%; will-change: transform; }
 #field { position: absolute; inset: 0; transform-origin: 50% 50%; will-change: transform; }
 .field-cell { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
+.layout-morph { position: absolute; inset: 0; z-index: 140; pointer-events: none; }
+.morph-card { position: absolute; left: 0; top: 0; background-position: center; background-size: cover; will-change: transform, width, height; }
+.view-toggle:disabled { cursor: default; }
 .field-tile { background-size: contain !important; background-repeat: no-repeat; background-color: transparent; }
 #gallery[data-view="field"] { cursor: grab; }
 #gallery.is-dragging, #gallery.is-dragging .tile { cursor: grabbing; }

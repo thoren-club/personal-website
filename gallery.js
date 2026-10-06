@@ -8,8 +8,8 @@ const fieldRoot = document.querySelector('#field');
 const viewControl = document.querySelector('.view-control');
 const viewToggle = document.querySelector('.view-toggle');
 let view = 'field';
-let viewAnimation = null;
-const field = { x: 0, y: 0, targetX: 0, targetY: 0, zoom: .9, cells: [], columns: 0, rows: 0, width: 400, gapX: 442.5, gapY: 337.5 };
+let layoutMotion = null;
+const field = { x: 0, y: 0, targetX: 0, targetY: 0, zoom: .9, baseZoom: 1, zoomAnchor: null, cells: [], columns: 0, rows: 0, width: 400, gapX: 442.5, gapY: 337.5 };
 const hint = document.querySelector('#hint');
 const announcement = document.querySelector('#announcement');
 const viewer = document.querySelector('#viewer');
@@ -56,8 +56,9 @@ function prepareField() {
   field.width = mobile ? 320 : 400;
   field.gapX = field.width + (mobile ? 37.5 : 42.5);
   field.gapY = field.width * .75 + (mobile ? 35 : 37.5);
-  const columns = Math.ceil(innerWidth / (field.gapX * .84)) + 6;
-  const rows = Math.ceil(innerHeight / (field.gapY * .84)) + 6;
+  const coverageZoom = Math.min(field.zoom, field.baseZoom) * .84;
+  const columns = Math.ceil(innerWidth / (field.gapX * coverageZoom)) + 6;
+  const rows = Math.ceil(innerHeight / (field.gapY * coverageZoom)) + 6;
   if (columns === field.columns && rows === field.rows) return;
   fieldRoot.replaceChildren(); field.cells = [];
   field.columns = columns; field.rows = rows;
@@ -81,8 +82,15 @@ function renderField(dt) {
     const follow = reduced ? 1 : 1 - Math.exp(-dt / (drag ? 85 : 150));
     field.x += (field.targetX - field.x) * follow;
     field.y += (field.targetY - field.y) * follow;
-    const zoomTarget = drag && (drag.mouse || drag.moved) ? .86 : 1;
-    field.zoom += (zoomTarget - field.zoom) * (reduced ? 1 : 1 - Math.exp(-dt / (drag ? 220 : 370)));
+    const zoomTarget = field.baseZoom * (drag && (drag.mouse || drag.moved) ? .86 : 1);
+    field.zoom = Math.exp(Math.log(field.zoom) + Math.log(zoomTarget / field.zoom) * (reduced ? 1 : 1 - Math.exp(-dt / (drag ? 220 : 370))));
+    if (field.zoomAnchor) {
+      const anchor = field.zoomAnchor;
+      field.x = anchor.worldX - anchor.x / field.zoom;
+      field.y = anchor.worldY - anchor.y / field.zoom;
+      field.targetX = field.x; field.targetY = field.y;
+      if (Math.abs(Math.log(zoomTarget / field.zoom)) < .0001) field.zoomAnchor = null;
+    }
   }
   const startColumn = Math.floor(field.x / field.gapX) - Math.floor(field.columns / 2);
   const startRow = Math.floor(field.y / field.gapY) - Math.floor(field.rows / 2);
@@ -127,13 +135,16 @@ function renderField(dt) {
   stage.dataset.fieldZoom = field.zoom.toFixed(4);
   if (!hintShown) {
     hintShown = true;
-    hint.textContent = touchQuery.matches ? 'Drag to explore' : 'Drag or scroll to explore';
+    hint.textContent = touchQuery.matches ? 'Drag to explore' : 'Drag to explore · Scroll to zoom';
     hint.classList.add('visible'); setTimeout(() => hint.classList.remove('visible'), 6000);
   }
-  return animating || (!selected && (Math.abs(field.x - field.targetX) + Math.abs(field.y - field.targetY) > .05 || Math.abs(field.zoom - (drag && (drag.mouse || drag.moved) ? .86 : 1)) > .0001));
+  return animating || (!selected && (Math.abs(field.x - field.targetX) + Math.abs(field.y - field.targetY) > .05 || Math.abs(Math.log(field.zoom / (field.baseZoom * (drag && (drag.mouse || drag.moved) ? .86 : 1)))) > .0001));
 }
 function setView(nextView) {
-  if (selected || drag) return;
+  if (selected || drag || layoutMotion) return;
+  const previousView = stage.dataset.view;
+  const source = previousView && !reduced ? snapshotLayout(previousView) : [];
+  if (frame) { cancelAnimationFrame(frame); frame = 0; }
   if (document.activeElement.classList.contains('tile')) document.activeElement.blur();
   view = nextView;
   fieldRoot.hidden = view !== 'field'; fieldRoot.inert = view !== 'field';
@@ -141,13 +152,90 @@ function setView(nextView) {
   stage.dataset.view = view; viewToggle.dataset.view = view;
   const label = view === 'field' ? 'Switch to orbit view' : 'Switch to field view';
   viewToggle.setAttribute('aria-label', label); viewToggle.title = label;
-  if (view === 'field') { field.zoom = .9; prepareField(); }
-  else {
-    skipIntro = true;
-    viewAnimation?.cancel();
-    if (!reduced) viewAnimation = root.animate([{transform: 'scale(.88)'}, {transform: 'scale(1)'}], {duration: 750, easing: 'cubic-bezier(.22,.7,.25,1)'});
+  field.zoomAnchor = null;
+  if (view === 'field') { field.zoom = field.baseZoom; prepareField(); }
+  else skipIntro = true;
+  field.cells.forEach(cell => { cell.button.classList.remove('is-hovered'); cell.button.dataset.hoverScale = '1'; });
+  rings.forEach(r => r.cards.forEach(button => { button.classList.remove('is-hovered'); button.dataset.hoverScale = '1'; }));
+  hintShown = false;
+  if (source.length) {
+    // Measure the destination before paint, then move matching photographs.
+    render(performance.now());
+    beginLayoutMotion(source, snapshotLayout(view));
   }
-  hintShown = false; requestRender();
+  requestRender();
+}
+function snapshotLayout(layout) {
+  const records = layout === 'field' ? field.cells.map(cell => ({button: cell.button, owner: cell})) : rings.flatMap(ring => ring.cards.map(button => ({button, owner: ring})));
+  return records.flatMap(({button, owner}) => {
+    const rect = button.getBoundingClientRect();
+    const hover = Number(button.dataset.hoverScale || 1);
+    const width = button.offsetWidth * owner.worldScale * hover;
+    const height = button.offsetHeight * owner.worldScale * hover;
+    if (!rect.width || width < .65 || !button.style.backgroundImage) return [];
+    return [{x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, width, height,
+      angle: Number(button.dataset.worldAngle || 0), artwork: button.dataset.artwork,
+      image: button.style.backgroundImage, layer: Number(owner.node.style.zIndex || 1),
+      visible: getComputedStyle(owner.node).visibility !== 'hidden' && rect.right > 0 && rect.bottom > 0 && rect.left < innerWidth && rect.top < innerHeight}];
+  });
+}
+function nearestPhoto(photo, candidates) {
+  const same = candidates.filter(candidate => candidate.artwork === photo.artwork);
+  const choices = same.length ? same : candidates.filter(candidate => !candidate.visible);
+  const closest = choices.reduce((best, candidate) => {
+    const distance = (candidate.x - photo.x) ** 2 + (candidate.y - photo.y) ** 2 + (candidate.visible ? 0 : (innerWidth ** 2 + innerHeight ** 2) * 4);
+    return !best || distance < best.distance ? {photo: candidate, distance} : best;
+  }, null)?.photo;
+  // Photos absent from a viewport enter from beyond its edge, avoiding
+  // a different texture suddenly appearing over an existing photograph.
+  if (same.length) return closest;
+  return closest ? {...closest, artwork: photo.artwork, image: photo.image} : {...photo, x: innerWidth + photo.width, visible: false};
+}
+function beginLayoutMotion(source, destination) {
+  if (!destination.length) return;
+  const layer = document.createElement('div'); layer.className = 'layout-morph';
+  layer.setAttribute('aria-hidden', 'true');
+  const used = new Set(), cards = [];
+  const add = (from, to) => {
+    if (!from || !to) return;
+    const node = document.createElement('div'); node.className = 'morph-card';
+    node.style.backgroundImage = to.image;
+    layer.append(node); cards.push({node, from, to});
+  };
+  for (const target of destination.filter(photo => photo.visible)) {
+    const origin = nearestPhoto(target, source);
+    used.add(origin); add(origin, target);
+  }
+  // Copies that are no longer needed converge into the same photograph;
+  // the reverse transition naturally multiplies those copies again.
+  for (const origin of source.filter(photo => photo.visible && !used.has(photo))) add(origin, nearestPhoto(origin, destination));
+  fieldRoot.style.visibility = 'hidden'; root.style.visibility = 'hidden';
+  stage.append(layer); stage.setAttribute('aria-busy', 'true'); viewToggle.disabled = true;
+  layoutMotion = {layer, cards, start: performance.now(), duration: 2800};
+  renderLayoutMotion(layoutMotion.start);
+}
+function renderLayoutMotion(now) {
+  const t = reduced ? 1 : clamp((now - layoutMotion.start) / layoutMotion.duration, 0, 1);
+  const p = accelerate(t);
+  for (const {node, from, to} of layoutMotion.cards) {
+    const x = from.x + (to.x - from.x) * p, y = from.y + (to.y - from.y) * p;
+    const width = Math.exp(Math.log(from.width) + Math.log(to.width / from.width) * p);
+    const height = Math.exp(Math.log(from.height) + Math.log(to.height / from.height) * p);
+    const turn = modulo(to.angle - from.angle + 180, 360) - 180;
+    node.style.width = `${width}px`; node.style.height = `${height}px`;
+    node.style.transform = `translate3d(${x}px,${y}px,0) translate(-50%,-50%) rotate(${from.angle + turn * p}deg)`;
+    node.style.zIndex = String(Math.round(from.layer + (to.layer - from.layer) * p));
+  }
+  stage.dataset.transition = 'morphing'; stage.dataset.transitionProgress = p.toFixed(4);
+  if (t === 1) finishLayoutMotion();
+}
+function finishLayoutMotion() {
+  layoutMotion.layer.remove(); layoutMotion = null;
+  fieldRoot.style.visibility = ''; root.style.visibility = '';
+  stage.setAttribute('aria-busy', 'false'); stage.dataset.transition = 'idle';
+  viewToggle.disabled = false;
+  announcement.textContent = view === 'field' ? 'Field view. Drag to explore; scroll to zoom.' : 'Orbit view.';
+  if (pendingArtworks) { const items = pendingArtworks; pendingArtworks = null; setArtworks(items); }
 }
 viewToggle.addEventListener('click', () => setView(view === 'field' ? 'orbit' : 'field'));
 document.addEventListener('pointermove', e => {
@@ -160,6 +248,7 @@ function requestRender() {
   if (!frame && !document.hidden) { lastTime = performance.now(); frame = requestAnimationFrame(render); }
 }
 function resize() {
+  if (layoutMotion) finishLayoutMotion();
   const brand = document.querySelector('.brand-name');
   if (brand) brand.style.setProperty('--brand-scale', brand.clientWidth / 487);
   scale = Math.min(innerWidth / 1080, innerHeight / 1080);
@@ -169,6 +258,10 @@ function resize() {
 }
 function render(now) {
   const dt = clamp(now - lastTime, 0, 50); lastTime = now;
+  if (layoutMotion) {
+    renderLayoutMotion(now);
+    frame = requestAnimationFrame(render); return;
+  }
   if (cameraMotion) {
     const t = reduced ? 1 : clamp((now - cameraMotion.start) / cameraMotion.duration, 0, 1);
     camera = cameraMotion.from + (cameraMotion.to - cameraMotion.from) * accelerate(t);
@@ -306,18 +399,23 @@ stage.addEventListener('wheel', e => {
   e.preventDefault();
   const unit = e.deltaMode === 1 ? 20 : e.deltaMode === 2 ? innerHeight : 1;
   if (view === 'field') {
-    if (viewer.open) return;
+    if (viewer.open || layoutMotion || drag || e.shiftKey || !e.deltaY) return;
     interact();
-    field.targetX += (e.shiftKey && !e.deltaX ? e.deltaY : e.deltaX) * unit / field.zoom;
-    field.targetY += (e.shiftKey && !e.deltaX ? 0 : e.deltaY) * unit / field.zoom;
+    field.baseZoom = clamp(field.baseZoom * Math.exp(-clamp(e.deltaY * unit, -480, 480) * .0018), .45, 2.5);
+    field.zoomAnchor = {x: e.clientX - innerWidth / 2, y: e.clientY - innerHeight / 2,
+      worldX: field.x + (e.clientX - innerWidth / 2) / field.zoom,
+      worldY: field.y + (e.clientY - innerHeight / 2) / field.zoom};
+    prepareField();
     requestRender(); return;
   }
+  if (layoutMotion || e.shiftKey) return;
   move(clamp(e.deltaY * unit, -480, 480) / 850);
 }, { passive: false });
 stage.addEventListener('pointerdown', e => {
+  if (layoutMotion) return;
   if (view === 'field') {
     if (viewer.open || e.button !== 0 || (e.pointerType === 'mouse' && e.target.closest('.tile'))) return;
-    interact();
+    interact(); field.zoomAnchor = null;
     drag = { id: e.pointerId, x: e.clientX, y: e.clientY, previousX: e.clientX, previousY: e.clientY, moved: false, field: true, mouse: e.pointerType === 'mouse' };
     if (e.pointerType === 'mouse') stage.setPointerCapture(e.pointerId);
     if (drag.mouse) stage.classList.add('is-dragging');
@@ -357,7 +455,7 @@ function endDrag(e) {
 stage.addEventListener('pointerup', endDrag); stage.addEventListener('pointercancel', endDrag);
 stage.addEventListener('lostpointercapture', endDrag);
 document.addEventListener('keydown', e => {
-  if (viewer.open) return;
+  if (viewer.open || layoutMotion) return;
   if (e.target.closest('a, .view-toggle')) return;
   if (view === 'field') {
     if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home'].includes(e.key)) {
@@ -455,9 +553,8 @@ function renderCamera(dt) {
   }
 }
 function openCard(button, ring, returnKeyboardFocus) {
-  if (selected || !ARTWORKS.length) return;
-  viewAnimation?.cancel();
-  if (ring.field) { field.targetX = field.x; field.targetY = field.y; }
+  if (selected || layoutMotion || !ARTWORKS.length) return;
+  if (ring.field) { field.targetX = field.x; field.targetY = field.y; field.zoomAnchor = null; }
   interact(); motion = null; manualVelocity = 0;
   const item = ARTWORKS[Number(button.dataset.artwork)];
   stage.dataset.peakBlur = '0';
@@ -494,7 +591,7 @@ function finishReturn() {
   else if (document.activeElement === button) button.blur();
 }
 function setArtworks(items) {
-  if (selected) { pendingArtworks = items; return; }
+  if (selected || layoutMotion) { pendingArtworks = items; return; }
   ARTWORKS = items;
   field.cells.forEach(cell => { cell.key = null; });
   rings.forEach(ring => { ring.sequence = null; }); requestRender();
