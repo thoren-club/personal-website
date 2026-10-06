@@ -19,10 +19,12 @@ button { -webkit-tap-highlight-color: transparent; }
 .viewer-shade { position: absolute; inset: 0; background: #ffffff00; }
 .expanded-card { position: absolute; background: #fff; box-shadow: 0 4px 45.8px #00000040; transform-origin: center; overflow: hidden; }
 .expanded-image { display: block; width: 100%; height: 100%; object-fit: contain; }
-.close-button { position: absolute; width: 116px; height: 40px; border: 0; padding: 0 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; font: 500 12px Inter, Arial, sans-serif; color: #fff; background: #00000070; cursor: pointer; }
+.close-button { position: absolute; width: 100px; height: 40px; border: 0; padding: 0 8px; display: flex; align-items: center; justify-content: center; gap: 6px; font: 500 12px Inter, Arial, sans-serif; color: #595959; background: transparent; cursor: pointer; }
 .close-button[hidden] { display: none; }
-.close-button kbd { padding: 3px 4px; border: 1px solid #ffffff55; border-radius: 3px; font: inherit; font-size: 10px; }
-.close-button:focus-visible { outline: 2px solid #fff; outline-offset: -4px; }
+.close-button kbd { padding: 0; border: 0; font: inherit; font-size: 11px; color: #858585; }
+.close-separator { color: #a3a3a3; }
+.close-button:hover { color: #111; }
+.close-button:focus-visible { outline: 1px solid #595959; outline-offset: -4px; }
 .no-script { position: absolute; left: 24px; right: 24px; top: 45%; text-align: center; color: #484848; }
 @media (hover: none) { .tile.is-hovered { box-shadow: none; } }
 

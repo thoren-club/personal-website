@@ -236,8 +236,8 @@ function expandedGeometry() {
 }
 function positionExpanded() {
   const g = expandedGeometry();
-  closeButton.style.left = `${g.left + g.width - 118}px`;
-  closeButton.style.top = `${g.top + 2}px`;
+  closeButton.style.left = `${g.left + g.width - 102}px`;
+  closeButton.style.top = `${Math.max(8, g.top - 40)}px`;
 }
 function renderCamera(dt) {
   if (!selected) {
