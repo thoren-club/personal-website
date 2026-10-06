@@ -9,7 +9,7 @@ const viewControl = document.querySelector('.view-control');
 const viewToggle = document.querySelector('.view-toggle');
 let view = 'field';
 let layoutMotion = null;
-const field = { x: 0, y: 0, targetX: 0, targetY: 0, zoom: .9, baseZoom: 1, zoomAnchor: null, cells: [], columns: 0, rows: 0, width: 400, gapX: 442.5, gapY: 337.5 };
+const field = { x: 0, y: 0, targetX: 0, targetY: 0, zoom: .9, baseZoom: 1, cells: [], columns: 0, rows: 0, width: 400, gapX: 442.5, gapY: 337.5 };
 const hint = document.querySelector('#hint');
 const announcement = document.querySelector('#announcement');
 const viewer = document.querySelector('#viewer');
@@ -84,13 +84,6 @@ function renderField(dt) {
     field.y += (field.targetY - field.y) * follow;
     const zoomTarget = field.baseZoom * (drag && (drag.mouse || drag.moved) ? .86 : 1);
     field.zoom = Math.exp(Math.log(field.zoom) + Math.log(zoomTarget / field.zoom) * (reduced ? 1 : 1 - Math.exp(-dt / (drag ? 220 : 370))));
-    if (field.zoomAnchor) {
-      const anchor = field.zoomAnchor;
-      field.x = anchor.worldX - anchor.x / field.zoom;
-      field.y = anchor.worldY - anchor.y / field.zoom;
-      field.targetX = field.x; field.targetY = field.y;
-      if (Math.abs(Math.log(zoomTarget / field.zoom)) < .0001) field.zoomAnchor = null;
-    }
   }
   const startColumn = Math.floor(field.x / field.gapX) - Math.floor(field.columns / 2);
   const startRow = Math.floor(field.y / field.gapY) - Math.floor(field.rows / 2);
@@ -135,7 +128,7 @@ function renderField(dt) {
   stage.dataset.fieldZoom = field.zoom.toFixed(4);
   if (!hintShown) {
     hintShown = true;
-    hint.textContent = touchQuery.matches ? 'Drag to explore' : 'Drag to explore · Scroll to zoom';
+    hint.textContent = 'Drag to explore';
     hint.classList.add('visible'); setTimeout(() => hint.classList.remove('visible'), 6000);
   }
   return animating || (!selected && (Math.abs(field.x - field.targetX) + Math.abs(field.y - field.targetY) > .05 || Math.abs(Math.log(field.zoom / (field.baseZoom * (drag && (drag.mouse || drag.moved) ? .86 : 1)))) > .0001));
@@ -152,7 +145,6 @@ function setView(nextView) {
   stage.dataset.view = view; viewToggle.dataset.view = view;
   const label = view === 'field' ? 'Switch to orbit view' : 'Switch to field view';
   viewToggle.setAttribute('aria-label', label); viewToggle.title = label;
-  field.zoomAnchor = null;
   if (view === 'field') { field.zoom = field.baseZoom; prepareField(); }
   else skipIntro = true;
   field.cells.forEach(cell => { cell.button.classList.remove('is-hovered'); cell.button.dataset.hoverScale = '1'; });
@@ -234,7 +226,7 @@ function finishLayoutMotion() {
   fieldRoot.style.visibility = ''; root.style.visibility = '';
   stage.setAttribute('aria-busy', 'false'); stage.dataset.transition = 'idle';
   viewToggle.disabled = false;
-  announcement.textContent = view === 'field' ? 'Field view. Drag to explore; scroll to zoom.' : 'Orbit view.';
+  announcement.textContent = view === 'field' ? 'Field view. Drag to explore.' : 'Orbit view.';
   if (pendingArtworks) { const items = pendingArtworks; pendingArtworks = null; setArtworks(items); }
 }
 viewToggle.addEventListener('click', () => setView(view === 'field' ? 'orbit' : 'field'));
@@ -372,7 +364,7 @@ function render(now) {
   if (introDone && !hintShown) {
     hintShown = true;
     if (!interacted) {
-      hint.textContent = touchQuery.matches ? 'Swipe to explore' : 'Scroll to explore';
+      hint.textContent = touchQuery.matches ? 'Swipe to explore' : 'Click an image to explore';
       hint.classList.add('visible'); setTimeout(() => hint.classList.remove('visible'), 6000);
     }
   }
@@ -394,28 +386,11 @@ function move(delta, direct = false) {
   clearTimeout(announceTimer);
   announceTimer = setTimeout(() => { announcement.textContent = 'Moving between rings. Select an artwork.'; }, 950);
 }
-stage.addEventListener('wheel', e => {
-  if (e.ctrlKey) return;
-  e.preventDefault();
-  const unit = e.deltaMode === 1 ? 20 : e.deltaMode === 2 ? innerHeight : 1;
-  if (view === 'field') {
-    if (viewer.open || layoutMotion || drag || e.shiftKey || !e.deltaY) return;
-    interact();
-    field.baseZoom = clamp(field.baseZoom * Math.exp(-clamp(e.deltaY * unit, -480, 480) * .0018), .45, 2.5);
-    field.zoomAnchor = {x: e.clientX - innerWidth / 2, y: e.clientY - innerHeight / 2,
-      worldX: field.x + (e.clientX - innerWidth / 2) / field.zoom,
-      worldY: field.y + (e.clientY - innerHeight / 2) / field.zoom};
-    prepareField();
-    requestRender(); return;
-  }
-  if (layoutMotion || e.shiftKey) return;
-  move(clamp(e.deltaY * unit, -480, 480) / 850);
-}, { passive: false });
 stage.addEventListener('pointerdown', e => {
   if (layoutMotion) return;
   if (view === 'field') {
     if (viewer.open || e.button !== 0) return;
-    interact(); field.zoomAnchor = null;
+    interact();
     field.targetX = field.x; field.targetY = field.y;
     drag = { id: e.pointerId, x: e.clientX, y: e.clientY, previousX: e.clientX, previousY: e.clientY, moved: false, field: true, mouse: e.pointerType === 'mouse', capture: null };
     // Capture on the pressed card so an ordinary release still generates its
@@ -560,7 +535,7 @@ function renderCamera(dt) {
 }
 function openCard(button, ring, returnKeyboardFocus) {
   if (selected || layoutMotion || !ARTWORKS.length) return;
-  if (ring.field) { field.targetX = field.x; field.targetY = field.y; field.zoomAnchor = null; }
+  if (ring.field) { field.targetX = field.x; field.targetY = field.y; }
   interact(); motion = null; manualVelocity = 0;
   const item = ARTWORKS[Number(button.dataset.artwork)];
   stage.dataset.peakBlur = '0';
