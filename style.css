@@ -10,7 +10,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .tile.is-hovered, .tile:not(.camera-card):focus-visible { box-shadow: 0 4px 35px #00000024; z-index: 2; }
 .tile:not(.camera-card):focus-visible { outline: 3px solid #111; outline-offset: 8px; }
 .ring:not(.interactive) { pointer-events: none; }
-.vignette { position: fixed; inset: -1px; z-index: 200; pointer-events: none; background: radial-gradient(ellipse 50% 50% at 50% 50%, #ffffff00 0%, #ffffff00 18%, #ffffff99 70%, #fff 100%); }
+.vignette { position: fixed; inset: -1px; z-index: 200; pointer-events: none; background: radial-gradient(ellipse 60% 60% at 50% 50%, #ffffff00 0%, #ffffff00 40%, #ffffff08 55%, #ffffff1a 70%, #ffffff4d 85%, #ffffff99 100%, #ffffffdb 115%, #fff 130%); }
 .hint { position: absolute; z-index: 201; left: 0; right: 0; bottom: max(23px, env(safe-area-inset-bottom)); margin: 0; color: #858585; font-size: 11px; font-weight: 400; letter-spacing: .025em; text-align: center; pointer-events: none; visibility: hidden; }
 .hint.visible { visibility: visible; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
