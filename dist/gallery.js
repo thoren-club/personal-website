@@ -34,10 +34,10 @@ const rings = Array.from({ length: CONFIG.inner + CONFIG.outer + 1 }, () => {
     button.type = 'button'; button.className = 'tile'; button.tabIndex = -1;
     button.dataset.index = index;
     button.style.backgroundSize = 'cover'; button.style.backgroundPosition = 'center';
-    button.addEventListener('pointerenter', e => { if (e.pointerType === 'mouse') button.classList.add('is-hovered'); });
+    button.addEventListener('pointerenter', e => { if (e.pointerType === 'mouse' && !selected) button.classList.add('is-hovered'); });
     button.addEventListener('pointerleave', () => button.classList.remove('is-hovered'));
-    button.addEventListener('click', () => {
-      if (performance.now() >= suppressClickUntil && node.classList.contains('interactive')) openCard(button, ring);
+    button.addEventListener('click', event => {
+      if (performance.now() >= suppressClickUntil && node.classList.contains('interactive')) openCard(button, ring, event.detail === 0);
     });
     ring.cards.push(button); node.append(button);
   }
@@ -282,12 +282,13 @@ function renderCamera(dt) {
     if (sx + margin < 0 || sx - margin > innerWidth || sy + margin < 0 || sy - margin > innerHeight) card.style.visibility = 'hidden';
   }
 }
-function openCard(button, ring) {
+function openCard(button, ring, returnKeyboardFocus) {
   if (selected || !ARTWORKS.length) return;
   interact(); motion = null; manualVelocity = 0;
   const item = ARTWORKS[Number(button.dataset.artwork)];
   stage.dataset.peakBlur = '0';
-  selected = {button, ring, item};
+  selected = {button, ring, item, returnKeyboardFocus};
+  rings.forEach(r => r.cards.forEach(card => card.classList.remove('is-hovered')));
   stage.append(button); button.classList.add('camera-card');
   title.textContent = item.title;
   expandedImage.alt = item.title;
@@ -306,11 +307,15 @@ function closeCard() {
 }
 function finishReturn() {
   const button = selected.button;
+  const returnKeyboardFocus = selected.returnKeyboardFocus;
   button.style.backgroundImage = `url("${selected.item.thumb}")`; button.style.height = ''; button.style.width = ''; button.style.transform = '';
-  button.classList.remove('camera-card'); selected.ring.node.append(button);
+  button.classList.remove('camera-card', 'is-hovered'); selected.ring.node.append(button);
   selected = null; closing = false; viewer.close();
   if (pendingArtworks) { setArtworks(pendingArtworks); pendingArtworks = null; }
-  if (!touchQuery.matches) button.focus({ preventScroll: true });
+  // The dialog can restore focus itself. Escape must not turn a mouse click
+  // into a persistent keyboard highlight on the returning image.
+  if (returnKeyboardFocus) button.focus({ preventScroll: true });
+  else if (document.activeElement === button) button.blur();
 }
 function setArtworks(items) {
   if (selected) { pendingArtworks = items; return; }
