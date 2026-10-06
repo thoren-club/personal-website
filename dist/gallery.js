@@ -116,7 +116,7 @@ function render(now) {
         const item = ARTWORKS[modulo(sequence * 12 + i, ARTWORKS.length)];
         button.dataset.artwork = modulo(sequence * 12 + i, ARTWORKS.length);
         button.style.backgroundImage = `url("${item.thumb}")`;
-        button.setAttribute('aria-label', `Открыть ${item.title}`);
+        button.setAttribute('aria-label', `View ${item.title}`);
       });
     }
     if (!visible) continue;
@@ -158,7 +158,7 @@ function render(now) {
   if (introDone && !hintShown) {
     hintShown = true;
     if (!interacted) {
-      hint.textContent = touchQuery.matches ? 'Проведите вверх, чтобы исследовать' : 'Прокрутите, чтобы исследовать';
+      hint.textContent = touchQuery.matches ? 'Swipe to explore' : 'Scroll to explore';
       hint.classList.add('visible'); setTimeout(() => hint.classList.remove('visible'), 6000);
     }
   }
@@ -178,7 +178,7 @@ function move(delta, direct = false) {
   else motion = { to: destination };
   requestRender();
   clearTimeout(announceTimer);
-  announceTimer = setTimeout(() => { announcement.textContent = 'Следующее кольцо. Выберите работу.'; }, 950);
+  announceTimer = setTimeout(() => { announcement.textContent = 'Moving between rings. Select an artwork.'; }, 950);
 }
 stage.addEventListener('wheel', e => {
   if (e.ctrlKey) return;
