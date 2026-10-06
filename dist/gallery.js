@@ -1,16 +1,4 @@
 let ARTWORKS = window.GALLERY_IMAGES || [];
-const GREETINGS = [
-  'Привет', 'Hello', '你好', 'नमस्ते', 'Hola',
-  'Bonjour', 'مرحباً', 'Olá', 'হ্যালো', 'ہیلو',
-  'Halo', 'Hallo', 'こんにちは', '안녕하세요', 'Ciao',
-  'Merhaba', 'Xin chào', 'வணக்கம்', 'నమస్తే', 'سلام',
-];
-let greetingIndex = 0;
-document.title = GREETINGS[greetingIndex];
-setInterval(() => {
-  greetingIndex = (greetingIndex + 1) % GREETINGS.length;
-  document.title = GREETINGS[greetingIndex];
-}, 2000);
 let pendingArtworks = null;
 const vignette = document.querySelector(".vignette");
 let camera = 0, cameraMotion = null, previousCameraLog = 0, cameraBlur = 0;
