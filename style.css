@@ -7,7 +7,7 @@ button { -webkit-tap-highlight-color: transparent; }
 #rings { position: absolute; inset: 0; }
 .ring { position: absolute; left: 50%; top: 50%; width: 0; height: 0; transform-origin: 0 0; }
 .tile { position: absolute; width: 160px; height: 160px; padding: 0; border: 0; border-radius: 0; background: var(--card); cursor: pointer; transform: translate(-50%, -50%) rotate(var(--angle)) scale(var(--hover, 1)); outline: 0; }
-.tile.is-hovered, .tile:not(.camera-card):focus-visible { box-shadow: 0 4px 35px #00000024; z-index: 2; }
+.tile.is-hovered, .tile:not(.camera-card):focus-visible { z-index: 2; }
 .tile:not(.camera-card):focus-visible { outline: 3px solid #111; outline-offset: 8px; }
 .ring:not(.interactive) { pointer-events: none; }
 .vignette { position: fixed; inset: -1px; z-index: 200; pointer-events: none; background: radial-gradient(ellipse 60% 60% at 50% 50%, #ffffff00 0%, #ffffff00 40%, #ffffff08 55%, #ffffff1a 70%, #ffffff4d 85%, #ffffff99 100%, #ffffffdb 115%, #fff 130%); }
@@ -26,7 +26,6 @@ button { -webkit-tap-highlight-color: transparent; }
 .close-button:hover { color: #111; }
 .close-button:focus-visible { outline: 1px solid #595959; outline-offset: -4px; }
 .no-script { position: absolute; left: 24px; right: 24px; top: 45%; text-align: center; color: #484848; }
-@media (hover: none) { .tile.is-hovered { box-shadow: none; } }
 
 
 #rings { transform-origin: 50% 50%; will-change: transform; }

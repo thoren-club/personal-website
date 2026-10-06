@@ -414,10 +414,13 @@ stage.addEventListener('wheel', e => {
 stage.addEventListener('pointerdown', e => {
   if (layoutMotion) return;
   if (view === 'field') {
-    if (viewer.open || e.button !== 0 || (e.pointerType === 'mouse' && e.target.closest('.tile'))) return;
+    if (viewer.open || e.button !== 0) return;
     interact(); field.zoomAnchor = null;
-    drag = { id: e.pointerId, x: e.clientX, y: e.clientY, previousX: e.clientX, previousY: e.clientY, moved: false, field: true, mouse: e.pointerType === 'mouse' };
-    if (e.pointerType === 'mouse') stage.setPointerCapture(e.pointerId);
+    field.targetX = field.x; field.targetY = field.y;
+    drag = { id: e.pointerId, x: e.clientX, y: e.clientY, previousX: e.clientX, previousY: e.clientY, moved: false, field: true, mouse: e.pointerType === 'mouse', capture: null };
+    // Capture on the pressed card so an ordinary release still generates its
+    // click, even while the camera pulls back or the pointer leaves the card.
+    if (drag.mouse) { drag.capture = e.target.closest('.field-tile') || stage; drag.capture.setPointerCapture(e.pointerId); }
     if (drag.mouse) stage.classList.add('is-dragging');
     field.cells.forEach(cell => cell.button.classList.remove('is-hovered'));
     requestRender(); return;
@@ -429,7 +432,7 @@ stage.addEventListener('pointermove', e => {
   if (!drag || drag.id !== e.pointerId) return;
   if (drag.field) {
     if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 6) {
-      if (!drag.moved && !stage.hasPointerCapture(e.pointerId)) stage.setPointerCapture(e.pointerId);
+      if (!drag.moved && !drag.capture) { drag.capture = stage; stage.setPointerCapture(e.pointerId); }
       drag.moved = true;
       stage.classList.add('is-dragging');
     }
@@ -448,8 +451,11 @@ stage.addEventListener('pointermove', e => {
 });
 function endDrag(e) {
   if (drag?.id !== e.pointerId) return;
+  if (e.type === 'lostpointercapture' && e.target !== drag.capture) return;
+  const capture = drag.capture;
+  if (drag.moved) suppressClickUntil = performance.now() + 350;
   drag = null; stage.classList.remove('is-dragging');
-  if (stage.hasPointerCapture(e.pointerId)) stage.releasePointerCapture(e.pointerId);
+  if (capture?.hasPointerCapture(e.pointerId)) capture.releasePointerCapture(e.pointerId);
   requestRender();
 }
 stage.addEventListener('pointerup', endDrag); stage.addEventListener('pointercancel', endDrag);
